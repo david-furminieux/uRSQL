@@ -4,7 +4,7 @@ import unittest
 from levelSQL.astnodes import (NullValue, IntegerValue, FloatValue,
     SummExpression, StringValue, Addition, Substraction,
     ProductExpression, Multiplication, Division, Modulo, VariableValue,
-    LogicConstant)
+    LogicConstant, Conjunction, Disjunction, Negation)
 from levelSQL.parser import SQLPrser
 
 
@@ -17,7 +17,7 @@ class ParserTest(unittest.TestCase):
 
     def testVariables(self):
         
-        result = self._parse('expr', 'a')
+        result = self._parse('expr', ' a')
         self.assertIsInstance(result, VariableValue)
         self.assertEqual(result.getColumnName(), 'a')
         self.assertIsNone(result.getRelationName())
@@ -123,17 +123,19 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(result.getElems()[1].getArgument(), IntegerValue(2))
 
         result = self._parse('expr', '1*2+3')
-        self.assertIsInstance(result, ProductExpression)
+        self.assertIsInstance(result, SummExpression)
         self.assertEqual(len(result.getElems()), 2)
-        self.assertIsInstance(result.getElems()[0], Multiplication)
-        self.assertEqual(result.getElems()[0].getArgument(), IntegerValue(1))
-        self.assertIsInstance(result.getElems()[1].getArgument(), SummExpression)
+        self.assertIsInstance(result.getElems()[0], Addition)
+        self.assertIsInstance(result.getElems()[0].getArgument(), ProductExpression)
+        self.assertEqual(result.getElems()[1].getArgument(), IntegerValue(3))
 
         result = self._parse('expr', '1+2*3')
-        self.assertIsInstance(result, ProductExpression)
+        self.assertIsInstance(result, SummExpression)
         self.assertEqual(len(result.getElems()), 2)
-        self.assertIsInstance(result.getElems()[0], Multiplication)
-        self.assertIsInstance(result.getElems()[0].getArgument(), SummExpression)
+        self.assertIsInstance(result.getElems()[1].getArgument(), ProductExpression)
+
+        result = self._parse('expr', '(1+2)*3')
+        self.assertIsInstance(result, ProductExpression)
 
     def testLogicConstants(self):
         
@@ -148,6 +150,48 @@ class ParserTest(unittest.TestCase):
         result = self._parse('predicate', 'NULL')
         self.assertIsInstance(result, LogicConstant)
         self.assertIsNone(result.getValue())
+    
+    def testlogicCompounds(self):
+        
+        result = self._parse('predicate', 'TRUE AND TRUE')
+        self.assertIsInstance(result, Conjunction)
+        
+        result = self._parse('predicate', 'TRUE OR TRUE')
+        self.assertIsInstance(result, Disjunction)
+
+        result = self._parse('predicate', 'NOT TRUE')
+        self.assertIsInstance(result, Negation)
+
+        result = self._parse('predicate', 'NOT NOT TRUE')
+        self.assertIsInstance(result, LogicConstant)
+
+        result = self._parse('predicate', 'NOT NOT NOT TRUE')
+        self.assertIsInstance(result, Negation)
+
+        result = self._parse('predicate', 'TRUE OR TRUE AND TRUE')
+        self.assertIsInstance(result, Disjunction)
+
+        result = self._parse('predicate', 'TRUE AND TRUE OR TRUE')
+        self.assertIsInstance(result, Disjunction)
+
+        result = self._parse('predicate', '(TRUE OR TRUE) AND TRUE')
+
+    def testSelectStmt(self):
+        
+        result = self._parse('stmt', 'SELECT * FROM bla;')
+        print result
+
+        result = self._parse('stmt', '''
+          SELECT
+            a AS d,a+1,a.b*c.d
+          FROM rel1, rel2
+          WHERE a.b=1 AND c=3
+          #GROUP BY laber, blup WITH ROLLUP
+          #HAVING d = 1
+          #ORDER BY k ASC, c DESC
+          ;
+        ''')
+        print result
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

@@ -8,6 +8,36 @@ class ASTNode(object):
     def accept(self, visitor):
         raise NotImplementedError(type(self))
 
+class Statement(ASTNode): pass
+
+class Selection(Statement): pass
+
+class SimpleSelection(Selection):
+    
+    def __init__(self, rel, proj, selection):
+        super(SimpleSelection, self).__init__()
+#         if not isinstance(rel, Relation):
+#             raise InconsistentStructure(type(rel))
+        if selection is not None and not isinstance(selection, LogicNode):
+            raise InconsistentStructure(type(selection))
+        self._rel = rel
+        self._proj = proj
+        self._selection = selection
+
+class Relation(ASTNode): pass
+
+class SimpleRelation(Relation):
+    '''
+    represents a simple table name. no join union or anything else applied.
+    '''
+    
+    def __init__(self, name):
+        super(SimpleRelation, self).__init__()
+        self._name = name
+
+    def getName(self):
+        return self._name
+
 class Constant(ASTNode):
 
     def __init__(self, value):
@@ -50,7 +80,13 @@ class Conjunction(LogicalCompound): pass
 
 class Disjunction(LogicalCompound): pass
 
-class Negation(LogicNode): pass
+class Negation(LogicNode):
+    
+    def __init__(self, value):
+        if not isinstance(value, LogicNode):
+            raise InconsistentStructure(type(value))
+        super(Negation, self).__init__()
+        self._value = value
 
 class Comparison(LogicNode):
 
