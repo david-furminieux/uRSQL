@@ -14,25 +14,102 @@ stmt =
 #     | insertStmt
 #     | deleteStmt
 #     | updateStmt
-#     | createStmt
-#     | dropStmt
+      | createStmt
+      | dropStmt
       ):s
       SEMICOLON ws
       -> s
+
+###############################################################################
+#                           CREATE STATEMENT
+#
+createStmt = CREATE
+           ( DATABASE databaseName
+           | UNIQUE?:unique INDEX indexSpec(unique)
+           | TEMPORARY?:temp TABLE tableSpec(temp)
+           | MATERIALIZED?:mat VIEW viewName AS selectStmt
+           )
+
+tableSpec :temp = simpleRelation LPAREN tableElemList RPAREN # tableOptions
+
+tableElemList = tableElem (COMMA tableElem)*
+
+tableElem = colName colType colConstraint?
+          | tableConstraint
+
+colConstraint = (CONSTRAINT constraintName)?
+                ( NOT NULL
+                | NULL
+                | CHECK LPAREN predicate RPAREN
+                | DEFAULT expr
+                | PRIMARY KEY
+                | REFERENCES simpleRelation (LPAREN colName:name RPAREN -> name)?
+                  (ON DELETE action)? (ON UPDATE action)?
+                )+
+
+action = IGNORE | CASCADE | SET NULL
+
+tableConstraint = (CONSTRAINT constraintName)?
+                ( CHECK LPAREN expr RPAREN
+                | PRIMARY KEY LPAREN colNameList RPAREN
+                | UNIQUE LPAREN colNameList RPAREN
+                | PRIMARY KEY LPAREN colNameList RPAREN
+                | FOREIGN KEY LPAREN colNameList RPAREN
+                  REFERENCES simpleRelation LPAREN colNameList RPAREN
+                  (ON DELETE action)? (ON UPDATE action)?
+                )
+
+indexSpec :unique = indexName?
+          ON simpleRelation LPAREN exprList RPAREN (USING idxType)?
+
+idxType = ws id:name
+
+databaseName = ws id:name
+
+indexName = ws id:name
+
+viewName = ws id:name
+
+colNameList = colName (COMMA colName)*
+
+colName = ws id:name
+
+constraintName = ws id:name
+
+###############################################################################
+#                            DROP STATEMENT
+#
+dropStmt = DROP
+         ( DATABASE databaseNameList
+         | INDEX indexNameList
+         | TABLE simpleRelList
+         | VIEW viewNameList
+         )
+
+databaseNameList = databaseName:db1 (COMMA databaseName)*:rest
+                   -> db1 if len(rest)==0 else [db1]+rest
+
+indexNameList = indexName:i1 (COMMA indexName)*:rest
+                -> i1 if len(rest)==0 else [i1]+rest
+
+simpleRelList = simpleRelation:r1 (COMMA simpleRelation)*:rest
+                -> r1 if len(rest)==0 else [r1]+rest
+
+viewNameList = viewName:v1 (COMMA viewName)*:rest
+
 ###############################################################################
 #                           SELECT STATEMENT
 #
+selectStmt = selectFactor:f1 ((UNION|EXCEPT) ALL? selectFactor)*:rest
+             -> f1 if len(rest)==0 else [f1]+rest
 
-selectStmt = selectFactor:f1 #((UNION|EXCEPT) ALL? selectFactor)*
-             -> f1
+selectFactor = selectTerm:t1 (INTERSECT ALL? selectTerm)*:rest
+               -> t1 if len(rest)==0 else [t1]+rest
 
-selectFactor = selectTerm:t1 #(INTERSECT ALL? selectTerm)*:rest
-             -> t1
-selectTerm =
-           ( simpleSelectStmt
-           | LPAREN selectStmt:s RPAREN ->s
-           ):s (AS ws id)?
-           -> s
+selectTerm = ( simpleSelectStmt
+             | LPAREN selectStmt:s RPAREN ->s
+             ):s (AS ws id)?
+             -> s
 
 simpleSelectStmt = SELECT selectOptList projection:proj
                    FROM relation:rel
@@ -61,6 +138,29 @@ simpleRelation = ws id:name -> nodes.SimpleRelation(name)
 ordering = orderExpr:e1 (COMMA orderExpr)*:rest -> [e1]+rest
 
 orderExpr = expr (ASC|DESC)?
+
+###############################################################################
+#                                TYPES
+#
+
+colType = VARCHAR LPAREN length RPAREN
+        | CHAR LPAREN length RPAREN
+        | BIT LPAREN length RPAREN
+        | NUMERIC LPAREN length (COMMA length)? RPAREN
+        | DECIMAL LPAREN length (COMMA length)? RPAREN
+        | INTEGER
+        | INT
+        | SMALLINT
+        | FLOAT LPAREN length RPAREN
+        | REAL 
+        | DOUBLE PRECISION
+        | DATETIME (WITH TIME ZONE)?
+        | DATE 
+        | TIMESTAMP (WITH TIME ZONE)?
+        | TIME (WITH TIME ZONE)?
+        | BOOL
+
+length = <digit+>:ds -> int(ds)
 
 ###############################################################################
 #                                LOGIC
@@ -182,34 +282,73 @@ ws =
    | '#' ( ~'\n' anything)* '\n'
    )*
 
-ALL       = ws 'ALL'
-AND       = ws 'AND'
-AS        = ws 'AS'
-ASC       = ws 'ASC'
-BETWEEN   = ws 'BETWEEN'
-BY        = ws 'BY'
-CASE      = ws 'CASE'
-DESC      = ws 'DESC'
-DISTINCT  = ws 'DISTINCT'
-EXCEPT    = ws 'EXCEPT'
-FALSE     = ws 'FALSE' -> nodes.LogicValue(False)
-FROM      = ws 'FROM'
-GROUP     = ws 'GROUP'
-HAVING    = ws 'HAVING'
-IN        = ws 'IN'
-INTERSECT = ws 'INTERSECT'
-IS        = ws 'IS'
-LIKE      = ws 'LIKE'
-NOT       = ws 'NOT'
-NULL      = ws 'NULL' -> nodes.NullValue()
-OR        = ws 'OR'
-ORDER     = ws 'ORDER'
-ROLLUP    = ws 'ROLLUP'
-SELECT    = ws 'SELECT'
-TRUE      = ws 'TRUE'  -> nodes.LogicValue(True)
-UNION     = ws 'UNION'
-WHERE     = ws 'WHERE'
-WITH      = ws 'WITH'
+ALL          = ws 'ALL'
+AND          = ws 'AND'
+AS           = ws 'AS'
+ASC          = ws 'ASC'
+BETWEEN      = ws 'BETWEEN'
+BIT          = ws 'BIT'
+BOOL         = ws 'BOOL'
+BY           = ws 'BY'
+CASCADE      = ws 'CASCADE'
+CASE         = ws 'CASE'
+CHAR         = ws 'CHAR'
+CHECK        = ws 'CHECK'
+CONSTRAINT   = ws 'CONSTRAINT'
+CREATE       = ws 'CREATE'
+DATABASE     = ws 'DATABASE'
+DATE         = ws 'DATE'
+DATETIME     = ws 'DATETIME'
+DECIMAL      = ws 'DECIMAL'
+DEFAULT      = ws 'DEFAULT'
+DELETE       = ws 'DELETE'
+DESC         = ws 'DESC'
+DISTINCT     = ws 'DISTINCT'
+DOUBLE       = ws 'DOUBLE'
+DROP         = ws 'DROP'
+EXCEPT       = ws 'EXCEPT'
+FALSE        = ws 'FALSE' -> nodes.LogicValue(False)
+FLOAT        = ws 'FLOAT'
+FROM         = ws 'FROM'
+GROUP        = ws 'GROUP'
+HAVING       = ws 'HAVING'
+IGNORE       = ws 'IGNORE'
+IN           = ws 'IN'
+INDEX        = ws 'INDEX'
+INT          = ws 'INT'
+INTEGER      = ws 'INTEGER'
+INTERSECT    = ws 'INTERSECT'
+IS           = ws 'IS'
+KEY          = ws 'KEY'
+LIKE         = ws 'LIKE'
+MATERIALIZED = ws 'MATERIALIZED'
+NOT          = ws 'NOT'
+NULL         = ws 'NULL' -> nodes.NullValue()
+NUMERIC      = ws 'NUMERIC'
+ON           = ws 'ON'
+OR           = ws 'OR'
+ORDER        = ws 'ORDER'
+PRECISION    = ws 'PRECISION'
+PRIMARY      = ws 'PRIMARY'
+REAL         = ws 'REAL'
+REFERENCES   = ws 'REFERENCES'
+ROLLUP       = ws 'ROLLUP'
+SELECT       = ws 'SELECT'
+SMALLINT     = ws 'SMALLINT'
+TABLE        = ws 'TABLE'
+TEMPORARY    = ws 'TEMPORARY'
+TIME         = ws 'TIME'
+TIMESTAMP    = ws 'TIMESTAMP'
+TRUE         = ws 'TRUE'  -> nodes.LogicValue(True)
+UNION        = ws 'UNION'
+UNIQUE       = ws 'UNIQUE'
+UPDATE       = ws 'UPDATE'
+USING        = ws 'USING'
+VARCHAR      = ws 'VARCHAR'
+VIEW         = ws 'VIEW'
+WHERE        = ws 'WHERE'
+WITH         = ws 'WITH'
+ZONE         = ws 'ZONE'
 
 GREATER       = ws '>'
 GREATER_EQUAL = ws '>='

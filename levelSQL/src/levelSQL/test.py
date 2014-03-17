@@ -176,7 +176,7 @@ class ParserTest(unittest.TestCase):
 
         result = self._parse('predicate', '(TRUE OR TRUE) AND TRUE')
 
-    def testSelectStmt(self):
+    def testSimpleSelectStmt(self):
         
         result = self._parse('stmt', 'SELECT * FROM bla;')
         print result
@@ -191,6 +191,61 @@ class ParserTest(unittest.TestCase):
           #ORDER BY k ASC, c DESC
           ;
         ''')
+        print result
+
+    def testCreateStmt(self):
+        
+        result = self._parse('stmt', 'CREATE DATABASE bla;')
+        print result
+        
+        result = self._parse('stmt', '''
+            CREATE TABLE bla(
+              myVarChar VARCHAR(10) CONSTRAINT vCharNotNul NOT NULL,
+              myChar    CHAR(10) NULL,
+              myBit     BIT(2),
+              myNumeric NUMERIC(2,3),
+              myDecimal DECIMAL(1,2),
+              myInteger INTEGER,
+              myInt     INT CHECK(myInt>17) DEFAULT 42,
+              mySInt    SMALLINT PRIMARY KEY,
+              myFloat   FLOAT(7) REFERENCES bla,
+              myReal    REAL,
+              myDouble  DOUBLE PRECISION,
+              myDt      DATETIME WITH TIME ZONE,
+              myDate    DATE REFERENCES blup(date) ON DELETE IGNORE ON UPDATE CASCADE,
+              myTs      TIMESTAMP WITH TIME ZONE,
+              myTime    TIME WITH TIME ZONE,
+              myBool    BOOL
+            );
+        ''')
+        print result
+        
+        result = self._parse('stmt', '''
+          CREATE UNIQUE INDEX myIdx ON bla(a, a+b) USING myMethod;
+        ''')
+        print result
+        
+        result = self._parse('stmt', 'CREATE VIEW laber AS SELECT * FROM blup;')
+        print result
+
+    def testDropStmt(self):
+        
+        result = self._parse('stmt', 'DROP TABLE bla;')
+        print result
+
+        result = self._parse('stmt', 'DROP TABLE bla, blup;')
+        print result
+
+        result = self._parse('stmt', 'DROP DATABASE bla;')
+        print result
+         
+        result = self._parse('stmt', 'DROP DATABASE bla, blup;')
+        print result
+
+        result = self._parse('stmt', 'DROP INDEX bla, blup;')
+        print result
+
+        result = self._parse('stmt', 'DROP VIEW bla, blup;')
         print result
 
 if __name__ == "__main__":
