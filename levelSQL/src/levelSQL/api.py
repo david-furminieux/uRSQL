@@ -1,13 +1,12 @@
-
 class LevelSQLException(Exception):
     '''
-    a base class for all exception used within LevelSQL which are not std
+    a base class for all exceptions used within LevelSQL which are not std
     exceptions.
     '''
 
 class SyntaxException(LevelSQLException):
     '''
-    base class of all exception dealing with syntax and its inconsistencies.
+    base class of all exceptions dealing with syntax and its inconsistencies.
     '''
 
 class InconsistentStructure(SyntaxException): pass
