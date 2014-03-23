@@ -1,10 +1,13 @@
 from ometa.runtime import ParseError
 import unittest
 
-from levelSQL.astnodes import (NullValue, IntegerValue, FloatValue,
-    SummExpression, StringValue, Addition, Substraction,
+from levelSQL.astnodes import (CreateTableStatement, IntegerValue, FloatValue,
+    SummExpression, StringValue, Addition, Substraction, NullValue, 
     ProductExpression, Multiplication, Division, Modulo, VariableValue,
-    LogicConstant, Conjunction, Disjunction, Negation)
+    LogicConstant, Conjunction, Disjunction, Negation, FunctionCall,
+    DropTableStatement, DropDatabaseStatement, DropIndexStatement,
+    DropViewStatement, InsertStatement, CreateViewStatement,
+    CreateIndexStatement, CreateDatabaseStatement, SimpleSelection)
 from levelSQL.parser import SQLPrser
 
 
@@ -13,7 +16,9 @@ class ParserTest(unittest.TestCase):
     def _parse(self, rule, text, *args):
         parser = SQLPrser(text)
         method = getattr(parser, rule)
-        return method(*args)
+        ast = method(*args)
+        
+        return ast
 
     def testVariables(self):
         
@@ -137,6 +142,9 @@ class ParserTest(unittest.TestCase):
         result = self._parse('expr', '(1+2)*3')
         self.assertIsInstance(result, ProductExpression)
 
+        result = self._parse('expr', 'func(1+2,a)')
+        self.assertIsInstance(result, FunctionCall)
+
     def testLogicConstants(self):
         
         result = self._parse('predicate', 'TRUE')
@@ -179,7 +187,7 @@ class ParserTest(unittest.TestCase):
     def testSimpleSelectStmt(self):
         
         result = self._parse('stmt', 'SELECT * FROM bla;')
-        print result
+        self.assertIsInstance(result, SimpleSelection)
 
         result = self._parse('stmt', '''
           SELECT
@@ -191,12 +199,12 @@ class ParserTest(unittest.TestCase):
           #ORDER BY k ASC, c DESC
           ;
         ''')
-        print result
+        self.assertIsInstance(result, SimpleSelection)
 
     def testCreateStmt(self):
         
         result = self._parse('stmt', 'CREATE DATABASE bla;')
-        print result
+        self.assertIsInstance(result, CreateDatabaseStatement)
         
         result = self._parse('stmt', '''
             CREATE TABLE bla(
@@ -218,35 +226,46 @@ class ParserTest(unittest.TestCase):
               myBool    BOOL
             );
         ''')
-        print result
+        self.assertIsInstance(result, CreateTableStatement)
         
         result = self._parse('stmt', '''
           CREATE UNIQUE INDEX myIdx ON bla(a, a+b) USING myMethod;
         ''')
-        print result
+        self.assertIsInstance(result, CreateIndexStatement)
         
         result = self._parse('stmt', 'CREATE VIEW laber AS SELECT * FROM blup;')
-        print result
+        self.assertIsInstance(result, CreateViewStatement)
+
+    def testInsertStmt(self):
+        
+        result = self._parse('stmt', 'INSERT INTO bla VALUES (1);')
+        self.assertIsInstance(result, InsertStatement)
+        
+        result = self._parse('stmt', 'INSERT INTO bla VALUES (1,"a"), (2,"b");')
+        self.assertIsInstance(result, InsertStatement)
+        
+        result = self._parse('stmt', 'INSERT INTO bla(a,b) SELECT * FROM blup;')
+        self.assertIsInstance(result, InsertStatement)
 
     def testDropStmt(self):
         
         result = self._parse('stmt', 'DROP TABLE bla;')
-        print result
+        self.assertIsInstance(result, DropTableStatement)
 
         result = self._parse('stmt', 'DROP TABLE bla, blup;')
-        print result
+        self.assertIsInstance(result, DropTableStatement)
 
         result = self._parse('stmt', 'DROP DATABASE bla;')
-        print result
+        self.assertIsInstance(result, DropDatabaseStatement)
          
         result = self._parse('stmt', 'DROP DATABASE bla, blup;')
-        print result
+        self.assertIsInstance(result, DropDatabaseStatement)
 
         result = self._parse('stmt', 'DROP INDEX bla, blup;')
-        print result
+        self.assertIsInstance(result, DropIndexStatement)
 
         result = self._parse('stmt', 'DROP VIEW bla, blup;')
-        print result
+        self.assertIsInstance(result, DropViewStatement)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

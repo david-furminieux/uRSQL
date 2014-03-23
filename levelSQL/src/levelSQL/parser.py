@@ -8,10 +8,11 @@ __GRAMMAR__ = r'''
 ###############################################################################
 #                              STATEMENTS
 #
+stmts = stmt+
 
 stmt =
       ( selectStmt
-#     | insertStmt
+      | insertStmt
 #     | deleteStmt
 #     | updateStmt
       | createStmt
@@ -24,18 +25,26 @@ stmt =
 #                           CREATE STATEMENT
 #
 createStmt = CREATE
-           ( DATABASE databaseName
+           ( DATABASE databaseName:name -> nodes.CreateDatabaseStatement(name)
            | UNIQUE?:unique INDEX indexSpec(unique)
            | TEMPORARY?:temp TABLE tableSpec(temp)
-           | MATERIALIZED?:mat VIEW viewName AS selectStmt
+           | MATERIALIZED?:mat VIEW viewName:name AS selectStmt:stmt
+             -> nodes.CreateViewStatement(name, mat, stmt)
            )
 
-tableSpec :temp = simpleRelation LPAREN tableElemList RPAREN # tableOptions
+tableSpec :temp = simpleRelation:name LPAREN tableElemList:elemLst RPAREN
+                  (tableOptions)?:opts
+                  -> nodes.CreateTableStatement(name, elemLst, opts)
 
 tableElemList = tableElem (COMMA tableElem)*
 
 tableElem = colName colType colConstraint?
           | tableConstraint
+
+tableOptions = tableOption:head (COMMA tableOption)*:tail
+               -> [head]+tail
+
+tableOption = ws
 
 colConstraint = (CONSTRAINT constraintName)?
                 ( NOT NULL
@@ -59,9 +68,10 @@ tableConstraint = (CONSTRAINT constraintName)?
                   (ON DELETE action)? (ON UPDATE action)?
                 )
 
-indexSpec :unique = indexName?
-          ON simpleRelation LPAREN exprList RPAREN (USING idxType)?
-
+indexSpec :unique = indexName?:idxName
+          ON simpleRelation:rel LPAREN exprList:lst RPAREN
+          (USING idxType)?:method
+          -> nodes.CreateIndexStatement(idxName, rel, unique, lst, method)  
 idxType = ws id:name
 
 databaseName = ws id:name
@@ -77,13 +87,32 @@ colName = ws id:name
 constraintName = ws id:name
 
 ###############################################################################
+#                           INSERT STATEMENT
+#
+insertStmt = INSERT INTO simpleRelation:rel
+             (LPAREN idList:lst RPAREN -> lst)?:ids
+             ( VALUES valuesList:lst -> nodes.ExplicitRelation(lst)
+             | selectStmt
+             ):source -> nodes.InsertStatement(rel, ids, source)
+
+idList = ws id:id1 (COMMA ws id)*:lst -> [id1]+lst
+
+valuesList = values:first (COMMA values)*:lst
+             -> [first]+lst
+
+values = LPAREN constantList:lst RPAREN -> lst
+
+constantList = constant:c1 (COMMA constant)*:lst
+               -> [c1]+lst
+ 
+###############################################################################
 #                            DROP STATEMENT
 #
 dropStmt = DROP
-         ( DATABASE databaseNameList
-         | INDEX indexNameList
-         | TABLE simpleRelList
-         | VIEW viewNameList
+         ( DATABASE databaseNameList:lst -> nodes.DropDatabaseStatement(lst)
+         | INDEX indexNameList:lst       -> nodes.DropIndexStatement(lst)
+         | TABLE simpleRelList:lst       -> nodes.DropTableStatement(lst)
+         | VIEW viewNameList:lst         -> nodes.DropViewStatement(lst) 
          )
 
 databaseNameList = databaseName:db1 (COMMA databaseName)*:rest
@@ -224,6 +253,7 @@ term = ~(TRUE|FALSE)
      | LPAREN expr:e RPAREN -> e
      )
 functionCall = id:name LPAREN exprList:lst RPAREN
+             -> nodes.FunctionCall(name, lst)
 
 path = id:i1 (DOT id)?:i2 -> nodes.VariableValue(i1, i2)
 
@@ -315,7 +345,9 @@ HAVING       = ws 'HAVING'
 IGNORE       = ws 'IGNORE'
 IN           = ws 'IN'
 INDEX        = ws 'INDEX'
+INSERT       = ws 'INSERT'
 INT          = ws 'INT'
+INTO         = ws 'INTO'
 INTEGER      = ws 'INTEGER'
 INTERSECT    = ws 'INTERSECT'
 IS           = ws 'IS'
@@ -344,6 +376,7 @@ UNION        = ws 'UNION'
 UNIQUE       = ws 'UNIQUE'
 UPDATE       = ws 'UPDATE'
 USING        = ws 'USING'
+VALUES       = ws 'VALUES'
 VARCHAR      = ws 'VARCHAR'
 VIEW         = ws 'VIEW'
 WHERE        = ws 'WHERE'

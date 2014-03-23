@@ -8,7 +8,124 @@ class ASTNode(object):
     def accept(self, visitor):
         raise NotImplementedError(type(self))
 
-class Statement(ASTNode): pass
+class Statement(ASTNode):
+    '''
+    the base class of all explicit statements
+    '''
+
+class CreateStatement(Statement):
+    '''
+    a statement representing the creation of something.
+    '''
+
+class CreateViewStatement(CreateStatement):
+    '''
+    CREATE VIEW
+    '''
+    
+    def __init__(self, name, mat, relation):
+        super(CreateViewStatement, self).__init__()
+        self._name = name
+        self._materialized = mat
+        self._relation = relation
+
+    def accept(self, visitor):
+        visitor.startCreateView(self._name, self._materialized)
+        self._relation.accept(visitor)
+        visitor.stopCreateView(self._name, self._materialized)
+
+
+class CreateIndexStatement(CreateStatement):
+    '''
+    CREATE INDEX
+    '''
+    
+    def __init__(self, name, rel, unique, exprLst, method):
+        super(CreateIndexStatement, self).__init__()
+        self._name = name
+        self._relName = rel
+        self._isUnique = unique
+        self._elems = exprLst
+        self._method = method
+    
+    def accept(self, visitor):
+        self.startCreateIndex(self, self._name, self._relaName, self._isUnique,
+                              self._method)
+        self._elems.accept(visitor)
+        self.stopCreateIndex(self, self._name, self._relaName, self._isUnique,
+                             self._method)
+
+class CreateTableStatement(CreateStatement):
+    '''
+    CREATE TABLE
+    '''
+    
+    def __init__(self, name, elems, options):
+        super(CreateTableStatement, self).__init__()
+
+class CreateDatabaseStatement(CreateStatement):
+    '''
+    CREATE DATABASE
+    '''
+    
+    def __init__(self, name):
+        super(CreateDatabaseStatement, self).__init__()
+        self._name = name
+
+class DropStatement(Statement):
+    '''
+    the base statement for all DROP statements
+    '''
+    
+    def __init__(self, lst):
+        super(DropStatement, self).__init__()
+        self._elems = lst
+    
+    def getElements(self):
+        return self._elems
+
+class DropTableStatement(DropStatement):
+    '''
+    DROP TABLE
+    '''
+    
+    def __init__(self, relList):
+        super(DropTableStatement, self).__init__(relList)
+
+class DropDatabaseStatement(DropStatement):
+    '''
+    DROP DATABASE
+    '''
+    
+    def __init__(self, dbLst):
+        super(DropDatabaseStatement, self).__init__(dbLst)
+
+class DropIndexStatement(DropStatement):
+    '''
+    DROP INDEX
+    '''
+    
+    def __init__(self, idxList):
+        super(DropIndexStatement, self).__init__(idxList)
+
+class DropViewStatement(DropStatement):
+    '''
+    DROP VIEW
+    '''
+    
+    def __init__(self, viewLst):
+        super(DropViewStatement, self).__init__(viewLst)
+
+class InsertStatement(Statement):
+    
+    def __init__(self, rel, cols, source):
+        super(InsertStatement, self).__init__()
+
+class ExplicitRelation(object):
+    
+    def __init__(self, lst):
+        super(ExplicitRelation, self).__init__()
+        self._lst = lst
 
 class Selection(Statement): pass
 
@@ -159,6 +276,13 @@ class VariableValue(ExpressionNode):
     
     def getRelationName(self):
         return self._relName 
+
+class FunctionCall(ExpressionNode):
+    
+    def __init__(self, funcName, exprList):
+        super(FunctionCall, self).__init__()
+        self._funcName = funcName
+        self._args = exprList
 
 class ConstantExpression(Constant, ExpressionNode):
     '''
