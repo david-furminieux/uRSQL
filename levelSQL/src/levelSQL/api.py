@@ -1,4 +1,3 @@
-
 class LevelSQLException(Exception):
     '''
     a base class for all exceptions used within LevelSQL which are not std
